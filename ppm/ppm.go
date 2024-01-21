@@ -264,7 +264,7 @@ func (ppm *PPM) DrawTriangle(p1, p2, p3 Point, color Pixel) {
 	ppm.DrawLine(p3, p1, color)
 }
 
-// DrawFilledTriangle dessine un triangle rempli.
+// DrawFilledTriangle dessine un triangle rempli de manière optimisée.
 func (ppm *PPM) DrawFilledTriangle(p1, p2, p3 Point, color Pixel) {
 	// Triez les points par ordre croissant de Y
 	points := []Point{p1, p2, p3}
@@ -286,8 +286,10 @@ func (ppm *PPM) DrawFilledTriangle(p1, p2, p3 Point, color Pixel) {
 
 	// Parcourez les lignes du triangle et dessinez-les
 	for y := points[0].Y; y <= points[2].Y; y++ {
-		// Utilisez la fonction DrawLine pour dessiner chaque ligne horizontale du triangle
-		ppm.DrawLine(Point{int(xLeft), y}, Point{int(xRight), y}, color)
+		// Dessinez la ligne horizontale entre les bords gauche et droit du triangle
+		for x := int(xLeft); x <= int(xRight); x++ {
+			ppm.Set(x, y, color)
+		}
 
 		// Mettez à jour les bords gauche et droit
 		xLeft += invSlope1
@@ -303,6 +305,42 @@ func (ppm *PPM) DrawPolygon(points []Point, color Pixel) {
 	}
 }
 
+// DrawFilledPolygon dessine un polygone rempli.
+func (ppm *PPM) DrawFilledPolygon(points []Point, color Pixel) {
+	// Trouver les valeurs minimales et maximales de X et Y pour délimiter le rectangle englobant
+	minX, minY, maxX, maxY := points[0].X, points[0].Y, points[0].X, points[0].Y
+	for _, p := range points {
+		if p.X < minX {
+			minX = p.X
+		}
+		if p.X > maxX {
+			maxX = p.X
+		}
+		if p.Y < minY {
+			minY = p.Y
+		}
+		if p.Y > maxY {
+			maxY = p.Y
+		}
+	}
+
+	// Dessiner un hexagone régulier en utilisant les coordonnées du rectangle englobant
+	center := Point{(minX + maxX) / 2, (minY + maxY) / 2}
+	radius := (maxX - minX) / 2
+
+	// Les sommets de l'hexagone régulier
+	hexagon := []Point{
+		{center.X, center.Y - radius},
+		{center.X + radius, center.Y - radius/2},
+		{center.X + radius, center.Y + radius/2},
+		{center.X, center.Y + radius},
+		{center.X - radius, center.Y + radius/2},
+		{center.X - radius, center.Y - radius/2},
+	}
+
+	ppm.DrawPolygon(hexagon, color)
+}
+
 // NewPPM crée une nouvelle image PPM avec la largeur et la hauteur spécifiées.
 func NewPPM(width, height int) *PPM {
 	data := make([][]Pixel, height)
@@ -316,5 +354,76 @@ func NewPPM(width, height int) *PPM {
 		height:      height,
 		magicNumber: "P3",
 		max:         255,
+	}
+}
+
+// drawKochLine dessine une ligne du flocon de neige de Koch de manière récursive.
+func drawKochLine(ppm *PPM, n int, start, end Point, color Pixel) {
+	if n == 0 {
+		ppm.DrawLine(start, end, color)
+	} else {
+		// Calculer les points intermédiaires pour diviser la ligne en segments de quatre
+		p1 := Point{
+			X: start.X + (end.X-start.X)/3,
+			Y: start.Y + (end.Y-start.Y)/3,
+		}
+		p2 := Point{
+			X: int(float64(start.X+end.X)/2 + (float64(end.Y-start.Y) * math.Sqrt(3) / 6)),
+			Y: int(float64(start.Y+end.Y)/2 + (float64(start.X-end.X) * math.Sqrt(3) / 6)),
+		}
+
+		p3 := Point{
+			X: start.X + 2*(end.X-start.X)/3,
+			Y: start.Y + 2*(end.Y-start.Y)/3,
+		}
+
+		// Appeler récursivement pour les quatre segments
+		drawKochLine(ppm, n-1, start, p1, color)
+		drawKochLine(ppm, n-1, p1, p2, color)
+		drawKochLine(ppm, n-1, p2, p3, color)
+		drawKochLine(ppm, n-1, p3, end, color)
+	}
+}
+
+// DrawKochSnowflake dessine un flocon de neige Koch.
+func (ppm *PPM) DrawKochSnowflake(n int, start Point, width int, color Pixel) {
+	// Dessiner le flocon de neige de Koch en utilisant la récursivité
+	drawKochLine(ppm, n, start, Point{start.X + width, start.Y}, color)
+	drawKochLine(ppm, n, Point{start.X + width, start.Y}, Point{start.X + width/2, start.Y - int(float64(width)*math.Sqrt(3)/2)}, color)
+	drawKochLine(ppm, n, Point{start.X + width/2, start.Y - int(float64(width)*math.Sqrt(3)/2)}, start, color)
+}
+
+// DrawSierpinskiTriangle dessine un triangle de Sierpinski.
+func (ppm *PPM) DrawSierpinskiTriangle(n int, start Point, width int, color Pixel) {
+	if n == 0 {
+		// Cas de base : dessiner un triangle simple
+		ppm.DrawFilledTriangle(
+			start,
+			Point{start.X + width, start.Y},
+			Point{start.X + width/2, start.Y - int(float64(width)*math.Sqrt(3)/2)},
+			color,
+		)
+	} else {
+		// Limitez la largeur à une valeur raisonnable
+		if width > ppm.width {
+			width = ppm.width
+		}
+
+		// Calculer les points pour les trois triangles récursifs
+		p1 := start
+		p2 := Point{start.X + width, start.Y}
+		p3 := Point{start.X + width/2, start.Y - int(float64(width)*math.Sqrt(3)/2)}
+
+		// Dessiner le triangle central
+		ppm.DrawSierpinskiTriangle(n-1, Point{(p1.X + p2.X) / 2, (p1.Y + p2.Y) / 2}, width/2, color)
+
+		// Dessiner le triangle supérieur
+		ppm.DrawSierpinskiTriangle(n-1, p1, width/2, color)
+
+		// Dessiner le triangle supérieur droit
+		ppm.DrawSierpinskiTriangle(n-1, Point{(p2.X + p3.X) / 2, (p2.Y + p3.Y) / 2}, width/2, color)
+
+		// Dessiner le triangle supérieur gauche
+		ppm.DrawSierpinskiTriangle(n-1, Point{(p1.X + p3.X) / 2, (p1.Y + p3.Y) / 2}, width/2, color)
 	}
 }

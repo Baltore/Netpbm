@@ -230,4 +230,24 @@ func main() {
 	if err != nil {
 		log.Fatal("Erreur Polygon :", err)
 	}
+
+	// Créez une autre image PPM et le polygone rempli
+	imagePPM = ppm.NewPPM(100, 100)
+	imagePPM.DrawFilledPolygon(polygonPoints, ppm.Pixel{R: 255, G: 255, B: 255})
+	imagePPM.Save("FilledPolygon.ppm")
+
+	// Créez une image PPM et Dessine le flocon de neige de Koch
+	imagePPM = ppm.NewPPM(400, 400)
+	startPoint := ppm.Point{X: 50, Y: 350}
+	imagePPM.DrawKochSnowflake(3, startPoint, 300, ppm.Pixel{R: 255, G: 255, B: 255})
+	err = imagePPM.Save("KochSnowflake.ppm")
+	if err != nil {
+		log.Fatal("Erreur KochSnowflake :", err)
+	}
+
+	// Créez une image PPM et Dessine le triangle de Sierpinski
+	imagePPM = ppm.NewPPM(100, 100)
+	imagePPM.DrawSierpinskiTriangle(4, ppm.Point{25, 75}, 50, ppm.Pixel{255, 0, 0})
+	imagePPM.Save("SierpinskiTriangle.ppm")
+
 }
